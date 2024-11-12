@@ -1,0 +1,92 @@
+# Import necessary libraries
+import tensorflow as tf
+from tensorflow.keras.datasets import imdb
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load the IMDb dataset
+max_features = 10000  # Use top 10,000 most frequent words
+max_len = 500  # Pad sequences to a maximum length of 500 words
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+
+# Pad sequences to make them the same length
+x_train = pad_sequences(x_train, maxlen=max_len)
+x_test = pad_sequences(x_test, maxlen=max_len)
+
+# Print shapes of training and test data
+print(f"Training data shape: {x_train.shape}")
+print(f"Test data shape: {x_test.shape}")
+
+# Build the model
+model = models.Sequential()
+
+# Embedding layer converts integer indices into dense vectors of fixed size
+model.add(layers.Embedding(input_dim=max_features, output_dim=128, input_length=max_len))
+
+# Add LSTM layer for sequence processing
+model.add(layers.LSTM(128))
+
+# Dense layer for binary classification (positive/negative sentiment)
+model.add(layers.Dense(1, activation='sigmoid'))
+
+# Compile the model with binary cross-entropy loss and adam optimizer
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Model summary to visualize the architecture
+model.summary()
+
+# Train the model
+history = model.fit(x_train, y_train, epochs=5, batch_size=64, validation_data=(x_test, y_test), verbose=2)
+
+# Evaluate the model on the test data
+test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=2)
+
+print(f"Test accuracy: {test_accuracy * 100:.2f}%")
+
+# Visualize training and validation accuracy
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Accuracy over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+# Visualize training and validation loss
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Loss over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+# Function to preprocess new reviews
+def preprocess_review(review):
+    word_index = imdb.get_word_index()
+    tokens = review.lower().split()
+    tokenized_review = [word_index.get(word, 0) for word in tokens]  # Convert words to integers
+    return pad_sequences([tokenized_review], maxlen=max_len)
+
+# Sample review to classify
+sample_review = "This movie was fantastic! The plot was engaging and the performances were amazing."
+
+# Preprocess the review
+preprocessed_review = preprocess_review(sample_review)
+
+# Predict sentiment (1: Positive, 0: Negative)
+prediction = model.predict(preprocessed_review)
+print(f"Predicted sentiment: {'Positive' if prediction > 0.5 else 'Negative'}")
+
+# Save the trained model to disk
+model.save('sentiment_model.h5')
+
+# Load the saved model
+loaded_model = tf.keras.models.load_model('sentiment_model.h5')
+
+# Evaluate the loaded model on the test data
+test_loss, test_accuracy = loaded_model.evaluate(x_test, y_test, verbose=2)
+print(f"Test accuracy (loaded model): {test_accuracy * 100:.2f}%")
